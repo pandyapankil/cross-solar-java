@@ -5,10 +5,17 @@ import com.crossover.techtrial.model.HourlyElectricity;
 import com.crossover.techtrial.model.Panel;
 import com.crossover.techtrial.service.HourlyElectricityService;
 import com.crossover.techtrial.service.PanelService;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -40,7 +47,9 @@ public class PanelController {
    */
   @PostMapping(path = "/api/register")
   public ResponseEntity<?> registerPanel(@RequestBody Panel panel) {
-    panelService.register(panel);
+	if (panel == null) {
+		  panelService.register(panel);
+	}
     return  ResponseEntity.accepted().build();
   }
   
@@ -55,6 +64,10 @@ public class PanelController {
   public ResponseEntity<?> saveHourlyElectricity(
       @PathVariable(value = "panel-serial") String panelSerial, 
       @RequestBody HourlyElectricity hourlyElectricity) {
+	  hourlyElectricity.setPanel(panelService.findBySerial(panelSerial));
+	  if (hourlyElectricity.getPanel() == null) {
+		  return ResponseEntity.notFound().build();
+	  }
     return ResponseEntity.ok(hourlyElectricityService.save(hourlyElectricity));
   }
    
@@ -64,7 +77,7 @@ public class PanelController {
   
   @GetMapping(path = "/api/panels/{panel-serial}/hourly")
   public ResponseEntity<?> hourlyElectricity(
-      @PathVariable(value = "banel-serial") String panelSerial,
+      @PathVariable(value = "panel-serial") String panelSerial,
       @PageableDefault(size = 5,value = 0) Pageable pageable) {
     Panel panel = panelService.findBySerial(panelSerial);
     if (panel == null) {
@@ -90,6 +103,33 @@ public class PanelController {
      * IMPLEMENT THE LOGIC HERE and FEEL FREE TO MODIFY OR ADD CODE TO RELATED CLASSES.
      * MAKE SURE NOT TO CHANGE THE SIGNATURE OF ANY END POINT. NO PAGINATION IS NEEDED HERE.
      */
+    Panel panel = panelService.findBySerial(panelSerial);
+    if (panel == null)
+      return ResponseEntity.notFound().build();
+
+    Page<HourlyElectricity> pageOfAllHourlyElectricityUntilYesterday = hourlyElectricityService.getAllHourlyElectricityByPanelId(panel.getId(), PageRequest.of(0, 24));
+    List<HourlyElectricity> listOfAllHourlyElectricityUntilYesterday = pageOfAllHourlyElectricityUntilYesterday.getContent();
+
+    Map<LocalDate, DailyElectricity> dailyElectricityMap = new HashMap<>();
+
+    if (listOfAllHourlyElectricityUntilYesterday != null && !listOfAllHourlyElectricityUntilYesterday.isEmpty()) {
+        for (HourlyElectricity hourlyElectricity : listOfAllHourlyElectricityUntilYesterday) {
+            LocalDateTime readingDateTime = hourlyElectricity.getReadingAt();
+            LocalDate readingDate = readingDateTime.toLocalDate();
+            DailyElectricity dailyElectricity = dailyElectricityMap.getOrDefault(readingDate, new DailyElectricity());
+            dailyElectricity.setSum(hourlyElectricity.getGeneratedElectricity() + dailyElectricity.getSum());
+            if (hourlyElectricity.getGeneratedElectricity() < dailyElectricity.getMin())
+                dailyElectricity.setMin(hourlyElectricity.getGeneratedElectricity());
+            if (hourlyElectricity.getGeneratedElectricity() > dailyElectricity.getMax())
+                dailyElectricity.setMax(hourlyElectricity.getGeneratedElectricity());
+            if (dailyElectricity.getSum() != 0)
+                dailyElectricity.setAverage((double) Long.divideUnsigned(dailyElectricity.getSum(), 24));
+            dailyElectricity.setDate(readingDate);
+            dailyElectricityMap.put(readingDate, dailyElectricity);
+        }
+    }
+
+    dailyElectricityForPanel.addAll(dailyElectricityMap.values());
     return ResponseEntity.ok(dailyElectricityForPanel);
   }
 }

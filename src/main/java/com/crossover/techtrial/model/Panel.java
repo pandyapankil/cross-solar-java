@@ -24,23 +24,37 @@ public class Panel implements Serializable {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  Long id;
+  private Long id;
 
   @NotNull
   @Column(name = "serial")
-  String serial;
+  private String serial;
 
   @Column(name = "longitude")
-  Double longitude;
+  private Double longitude;
 
   @Column(name = "latitude")
-  Double latitude;
+  private Double latitude;
 
   @Nullable
   @Column(name = "brand")
-  String brand;
+  private String brand;
 
-  public Long getId() {
+
+
+  public Panel(Long id, @NotNull String serial, Double longitude, Double latitude, String brand) {
+	this.id = id;
+	this.serial = serial;
+	this.longitude = longitude;
+	this.latitude = latitude;
+	this.brand = brand;
+}
+
+  public Panel() {
+
+  }
+
+public Long getId() {
     return id;
   }
 
@@ -52,7 +66,10 @@ public class Panel implements Serializable {
     return serial;
   }
 
-  public void setSerial(String serial) {
+  public void setSerial(String serial) throws Exception{
+
+    if (serial == null) throw new Exception();
+    if (serial.length() < 16) throw new Exception("Serial number must be 16 characters long");
     this.serial = serial;
   }
 
@@ -60,7 +77,8 @@ public class Panel implements Serializable {
     return longitude;
   }
 
-  public void setLongitude(Double longitude) {
+  public void setLongitude(Double longitude) throws Exception{
+    if (getDecimalPlaces(longitude) != 6) throw new Exception("Longitude must be of 6 decimal places!");
     this.longitude = longitude;
   }
 
@@ -68,7 +86,8 @@ public class Panel implements Serializable {
     return latitude;
   }
 
-  public void setLatitude(Double latitude) {
+  public void setLatitude(Double latitude) throws Exception{
+    if (getDecimalPlaces(latitude) != 6) throw new Exception("Latitude must be of 6 decimal places!");
     this.latitude = latitude;
   }
 
@@ -143,5 +162,11 @@ public class Panel implements Serializable {
   public String toString() {
     return "Panel [id=" + id + ", serial=" + serial + ", longitude=" + longitude + ", latitude="
         + latitude + ", brand=" + brand + "]";
+  }
+
+  private int getDecimalPlaces(Double number) {
+    String str = String.valueOf(number);
+    int decimalPlaces = str.length() - (str.indexOf(".") + 1);
+    return decimalPlaces > 0 ? decimalPlaces : 0;
   }
 }
